@@ -24,6 +24,9 @@ Each `unity command` costs seconds, so minimize round trips:
   whose local check already passes.
 - Run ONE combined `eval_file` for config + visuals + read-back logging, not
   separate scripts per concern.
+- Never enter Play mode and never screenshot for this skill: console + compile
+  is the verification bar. Play-mode smoke tests (sleeps + captures + stops)
+  cost minutes and are out of scope.
 - 30–60s assumes a warm Editor and (if needed) an incremental compile. A cold
   Editor or full recompile can exceed it — that time is environment-bound, not
   skippable. Screenshots are out of scope for this skill (a deliberate exception
@@ -79,12 +82,58 @@ Each `unity command` costs seconds, so minimize round trips:
    - `handTrackingSupport: 1` in
      `Assets/Oculus/OculusProjectConfig.asset`, AND both `OVRHandPrefabLeft`
      and `OVRHandPrefabRight` in the scene file → skip step 2.
-1. (Pinch wiring absent only) Source edit: add a cached `OVRHand`,
-   `TryResolveSameSideHand()`, `IsHandPinchHeld()`, and OR the result into
-   trigger-held. Then `unity command recompile` and poll `recompile_status`
-   ONCE with a generous wait; poll again only if still compiling. (Order
-   matters: do Editor-affecting `eval_file` work only after the game assembly
-   is freshly compiled — see gotchas.)
+1. (Pinch wiring absent only) Source edit: paste the proven block below
+   (adapt the `controller` field name to the gameplay class) and OR
+   `IsHandPinchHeld()` into the existing trigger-held expression, keeping
+   controller behavior unchanged. No hierarchy investigation is needed — the
+   walk-up handles clubs under controller anchors (e.g.
+   `RightControllerAnchor`) as well as hand anchors. Then poll
+   `recompile_status` ONCE with a generous wait; run a forced
+   `unity command recompile` only if still compiling/stale (forced recompiles
+   can stall on approval — auto-compile after a source edit usually
+   suffices). Poll again only if still compiling. (Order matters: do
+   Editor-affecting `eval_file` work only after the game assembly is freshly
+   compiled — see gotchas.)
+
+   ```csharp
+   private OVRHand sameSideHand;
+   private int handResolveNextFrame;
+
+   private void TryResolveSameSideHand()
+   {
+       if (sameSideHand != null) return;
+       if (Time.frameCount < handResolveNextFrame) return;
+       handResolveNextFrame = Time.frameCount + 30;
+       Transform anchor = transform;
+       while (anchor != null && anchor.name != "LeftHandAnchor" && anchor.name != "RightHandAnchor")
+           anchor = anchor.parent;
+       bool isLeft = controller == OVRInput.Controller.LTouch;
+       if (anchor != null)
+           isLeft = anchor.name == "LeftHandAnchor";
+       string expected = isLeft ? "OVRHandPrefabLeft" : "OVRHandPrefabRight";
+       if (anchor != null)
+       {
+           Transform named = anchor.Find(expected);
+           if (named != null)
+           {
+               var namedHand = named.GetComponent<OVRHand>();
+               if (namedHand != null) { sameSideHand = namedHand; return; }
+           }
+           var childHand = anchor.GetComponentInChildren<OVRHand>(true);
+           if (childHand != null) { sameSideHand = childHand; return; }
+       }
+       GameObject found = GameObject.Find(expected);
+       if (found != null) sameSideHand = found.GetComponent<OVRHand>();
+   }
+
+   private bool IsHandPinchHeld()
+   {
+       TryResolveSameSideHand();
+       if (sameSideHand == null) return false;
+       try { return sameSideHand.IsTracked && sameSideHand.GetFingerIsPinching(OVRHand.HandFinger.Index); }
+       catch { return false; }
+   }
+   ```
 2. (Config or visuals missing only) Run ONE `eval_file` that does all three
    in straight-line statements: set `handTrackingSupport` to `ControllersAndHands`
    and commit via
@@ -96,10 +145,20 @@ Each `unity command` costs seconds, so minimize round trips:
    Confirm via console logs — do NOT write a second verify script. Expected:
    left = `HandLeft`/`XRHandLeft`/`XRHandLeft`,
    right = `HandRight`/`XRHandRight`/`XRHandRight`.
-3. `unity command save_scene` (only if step 1 or 2 ran).
-4. Single verification pass: `recompile_status` is `completed` with no errors,
-   `editor_status` is `ready`, `get_console_logs --severity Error --limit 20`
-   returns zero logs, read-back lines show the expected side/skeleton/mesh.
+   Before running it, pre-resolve two facts locally (instant, zero Editor
+   calls) and fail fast instead of burning a round trip: confirm the prefab
+   exists at `Library/PackageCache/com.meta.xr.sdk.core*/Prefabs/OVRHandPrefab.prefab`
+   (an SDK upgrade may have moved it), and read the expected skeleton side up
+   front — `handSkeletonVersion` in
+   `Assets/Resources/OculusRuntimeSettings.asset` maps via
+   `OVRHandSkeletonVersion` (`1` == `OpenXR`, `0` == legacy `OVR`).
+3. `unity command save_scene` (only if step 1 or 2 ran AND the logs show a
+   change — skip when both anchors report existing hands and the config was
+   already set; a no-op save still risks a domain reload).
+4. Single verification pass in ONE shell call: `recompile_status` is
+   `completed` with no errors, `editor_status` is `ready`,
+   `get_console_logs --severity Error --limit 20` returns zero logs, and the
+   read-back lines show the expected side/skeleton/mesh.
 5. Check `git status` — revert `Assets/Resources/OculusRuntimeSettings.asset`
    if it was dirtied (e.g. by your own simulator toggle) to keep the
    hand-tracking diff minimal.
