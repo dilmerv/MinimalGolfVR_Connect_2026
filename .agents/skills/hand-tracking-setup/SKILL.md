@@ -27,4 +27,3 @@ Add end-to-end hand tracking to a Unity VR project using the Meta XR SDK. Drive 
 
 - `recompile_status` is `completed` with no errors and `editor_status` is `ready`.
 - `unity command get_console_logs --severity Error --limit 20` returns zero logs.
-- Enter Play mode, capture Game and Scene views (`capture_game_view` / `capture_scene_view` into `Assets/Temp/`), and visually inspect both screenshots before reporting completion. Game view must show tracked hands; a blank Scene capture means its camera is misframed (the Pipeline has no reframe command), not that the setup failed.
