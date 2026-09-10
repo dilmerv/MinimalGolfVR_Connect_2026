@@ -38,8 +38,9 @@ Each `unity command` costs seconds, so minimize round trips:
    drag-to-shoot gameplay). Only add the Interaction SDK grab stack
    (`HandGrabInteractor`, `SyntheticHand`, `HandGrabStateVisual`) when objects
    need grab posing.
-2. **Project config:** `handTrackingSupport = ControllersAndHands`,
-   `handTrackingFrequency = HIGH` (fast-motion gameplay such as a golf swing).
+2. **Project config:** `handTrackingSupport = ControllersAndHands`.
+   `handTrackingFrequency` is intentionally left untouched — out of scope for
+   this skill, whatever the project already uses stays.
 3. **Visuals:** instantiate `Packages/com.meta.xr.sdk.core/Prefabs/OVRHandPrefab.prefab`
    once under each `OVRCameraRig` anchor at `TrackingSpace/LeftHandAnchor` and
    `TrackingSpace/RightHandAnchor`, named `OVRHandPrefabLeft` / `OVRHandPrefabRight`.
@@ -67,15 +68,15 @@ Each `unity command` costs seconds, so minimize round trips:
   reflection as well.
 - `OVRRuntimeSettings.Instance.HandSkeletonVersion` containing `OpenXR` means
   use `XRHandLeft`/`XRHandRight` for skeleton + mesh types, else `HandLeft`/`HandRight`.
-- Asset YAML values (safe to `grep` locally): `handTrackingSupport: 1` ==
-  `ControllersAndHands`, `handTrackingFrequency: 1` == `HIGH` (`0` == `LOW`).
+- Asset YAML value (safe to `grep` locally): `handTrackingSupport: 1` ==
+  `ControllersAndHands`.
 
 ## Procedure
 
 0. Fast-path pre-checks (local, instant). Skip steps that already pass:
    - `IsHandPinchHeld` present in the gameplay source (e.g. `VRGolfClub.cs`)
      → skip step 1.
-   - `handTrackingSupport: 1` AND `handTrackingFrequency: 1` in
+   - `handTrackingSupport: 1` in
      `Assets/Oculus/OculusProjectConfig.asset`, AND both `OVRHandPrefabLeft`
      and `OVRHandPrefabRight` in the scene file → skip step 2.
 1. (Pinch wiring absent only) Source edit: add a cached `OVRHand`,
@@ -85,11 +86,13 @@ Each `unity command` costs seconds, so minimize round trips:
    matters: do Editor-affecting `eval_file` work only after the game assembly
    is freshly compiled — see gotchas.)
 2. (Config or visuals missing only) Run ONE `eval_file` that does all three
-   in straight-line statements: commit the project config (step 2 values via
-   `OVRProjectConfig.CommitProjectConfig(OVRProjectConfig.CachedProjectConfig)`),
-   install/skip visuals per anchor (Undo-registered, renamed, `HandType` via
-   `Array.IndexOf(prop.enumNames, …)`, skeleton/mesh via reflection), then
-   `Debug.Log` one `HANDVIS-READBACK … hand=… skel=… mesh=…` line per anchor.
+   in straight-line statements: set `handTrackingSupport` to `ControllersAndHands`
+   and commit via
+   `OVRProjectConfig.CommitProjectConfig(OVRProjectConfig.CachedProjectConfig)`
+   (never touch `handTrackingFrequency`), install/skip visuals per anchor
+   (Undo-registered, renamed, `HandType` via `Array.IndexOf(prop.enumNames, …)`,
+   skeleton/mesh via reflection), then `Debug.Log` one
+   `HANDVIS-READBACK … hand=… skel=… mesh=…` line per anchor.
    Confirm via console logs — do NOT write a second verify script. Expected:
    left = `HandLeft`/`XRHandLeft`/`XRHandLeft`,
    right = `HandRight`/`XRHandRight`/`XRHandRight`.
