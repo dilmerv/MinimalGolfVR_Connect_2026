@@ -95,4 +95,3 @@ narrow exception to the repo's metavr-first rule, scoped to this skill only.)
 - `recompile_status` is `completed` with no errors and `editor_status` is `ready`.
 - `unity command get_console_logs --severity Error --limit 20` returns zero logs.
 - Hands present under both anchors with correct side/skeleton/mesh (read-back check).
-- Meta XR Simulator activated; Game + Scene screenshots captured and visually inspected.
