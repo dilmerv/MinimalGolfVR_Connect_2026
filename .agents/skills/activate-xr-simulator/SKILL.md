@@ -23,3 +23,7 @@ Use the Unity CLI (`unity command`) to drive the Meta XR Simulator toolbar menu 
 
 - Check the console for `[Meta XR Simulator is activated]` (or `Status: Installed: Yes, Active: Yes` after running the Status item):
   `unity command console --tail 50 --project-path <project>`
+
+## Additional Rules
+
+- No need to check Meta XR Simulator Status, this opens a popup which I don't want to see during the activation.
