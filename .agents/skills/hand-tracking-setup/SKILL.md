@@ -14,128 +14,101 @@ Decisions below are settled — do NOT spend time re-deriving them via the
 `metavr` docs CLI or any other hand-related doc lookup. (This is a deliberate,
 narrow exception to the repo's metavr-first rule, scoped to this skill only.)
 
-## Speed budget (30–60s target)
+## Time budget (120s hard target)
 
-Each `unity command` costs seconds, so minimize round trips:
+Each `unity command` costs 5–15s, so the budget allows at most ~6 Unity calls.
+Rules to stay under it:
 
-- Check `editor_status` ONCE. Never run bare `unity command` discovery (huge
-  output) or API-probing `eval`s — every API fact needed is enshrined below.
-- Prefer instant local checks (`grep` the source/asset/scene files) over Unity
-  queries to decide what work remains. Every step is idempotent — skip steps
-  whose local check already passes.
-- Run ONE combined `eval_file` for config + data source + visuals + rig wiring
-  + read-back logging, not separate scripts per concern.
-- Never enter Play mode and never screenshot for this skill: console + compile
-  is the verification bar. Play-mode smoke tests (sleeps + captures + stops)
-  cost minutes and are out of scope.
-- 30–60s assumes a warm Editor and (if needed) an incremental compile. A cold
-  Editor or full recompile can exceed it — that time is environment-bound, not
-  skippable. Screenshots are out of scope for this skill (a deliberate exception
-  to the repo `AGENTS.md` screenshot requirement — you handle visual checks
-  yourself); that saves ~10–20s.
+- Batch ALL local checks into the single step-0 shell call. Never probe the
+  SDK at runtime: every prefab GUID, namespace, and serialized field name is
+  hardcoded in the pinned reference below for the SDK in this repo. If a
+  future upgrade moves things, update this skill file — do not burn runtime
+  discovering it.
+- Never run bare `unity command` discovery. The exact commands for Pipeline
+  0.6.0-exp.1 are listed below. `eval_file` does NOT exist in this Pipeline
+  version — the equivalent is `run_script` (a self-contained `.cs` file with
+  a named static entry point, compiled in-memory with no domain reload).
+- Never read whole source files to decide what to do — the step-0 greps are
+  the decision input. Never enter Play mode and never screenshot: console +
+  compile is the verification bar (a deliberate exception to the repo
+  `AGENTS.md` screenshot requirement — you handle visual checks yourself).
+- No fixed `sleep`s. The only wait is the bounded retry loop after exiting
+  Play mode (step 2).
 
 ## Settled decisions
 
-1. **Interaction SDK visuals, not Core `OVRHandPrefab`.** Core's
-   `SkinnedMeshRenderer` ships with no mesh — `OVRMesh` builds it at runtime via
-   `OVRPlugin.GetMesh()`, so Core hands are invisible in Edit mode. ISDK's
-   `OVRHandVisualLeft/Right` reference static FBX meshes (`OVRHand_L/R.fbx`),
-   so they render in the Scene view with no Play mode, track live data at
-   runtime, and auto-hide when untracked (`HandVisual.UpdateVisibility` disables
-   the renderer unless `Hand.IsTrackedDataValid` — no frozen ghost hands).
-   Do NOT use the `Ghost-Hand` prefabs for tracked visuals — those are static
-   grab-pose previews for the grab system. Do not add the grab stack
+1. **Interaction SDK visuals, not Core `OVRHandPrefab`.** ISDK visuals
+   reference static FBX meshes, so they render in the Scene view with no Play
+   mode and auto-hide when untracked. Do NOT use the `Ghost-Hand` prefabs
+   (static grab-pose previews) and do not add the grab stack
    (`HandGrabInteractor`, `SyntheticHand`, `HandGrabStateVisual`) when objects
-   need no grab posing (e.g. trigger-pull / drag-to-shoot gameplay).
-2. **Project config:** `handTrackingSupport = ControllersAndHands` — the ISDK
-   data source reads Core `OVRHand` tracking under the hood, so this stays
-   required. `handTrackingFrequency` is intentionally left untouched — out of
-   scope for this skill, whatever the project already uses stays.
-3. **Scene layout:** one `OVRHandsDataSource` instance at the scene root (its two
-   `Hand` components come pre-wired to the left/right modifier chains — never
-   rebuild this by hand); one `HandVisualLeft` / `HandVisualRight` (instantiated
-   from `OVRHandVisualLeft/Right`) under each `OVRCameraRig` anchor at
-   `TrackingSpace/LeftHandAnchor` / `TrackingSpace/RightHandAnchor`, each
-   injected via `HandVisual.InjectHand(matchingHand)`. Anchor parenting is safe:
-   `HandVisual` sets its root pose in world space. Remove any legacy Core
-   `OVRHandPrefabLeft/Right` instances so hands don't double-render at runtime.
-4. **Mandatory rig wiring (the prefab leaves these empty — Play-mode
-   `AssertionException`s result otherwise):** add `OVRCameraRigRef` to the
-   `OVRCameraRig` (point `_ovrCameraRig` at itself, set `_requireOvrHands =
-   false` since anchor `OVRHand`s are gone) and assign it to both sources'
-   `_cameraRigRef`; add ONE shared `TrackingToWorldTransformerOVR` (on the
-   data-source root, injected with the rig ref) and assign it to both sources'
+   need no grab posing.
+2. **Project config:** `handTrackingSupport = ControllersAndHands` (value
+   `1`). Never touch `handTrackingFrequency`.
+3. **Scene layout:** one `OVRHandsDataSource` at the scene root; one
+   `OVRHandVisualLeft` / `OVRHandVisualRight` under each rig anchor at
+   `TrackingSpace/LeftHandAnchor` / `TrackingSpace/RightHandAnchor`, each via
+   `HandVisual.InjectHand(matchingHand)`. Remove legacy Core
+   `OVRHandPrefab*` instances so hands don't double-render.
+4. **Mandatory rig wiring (prefab leaves these empty — Play-mode
+   `AssertionException`s result otherwise):** `OVRCameraRigRef` on the rig
+   (`_ovrCameraRig` = the rig, `_requireOvrHands = false`) assigned to both
+   sources' `_cameraRigRef`; ONE shared `TrackingToWorldTransformerOVR` on
+   the data-source root (injected with the rig ref) assigned to both sources'
    `_trackingToWorldTransformer`. The sources' `_ovrHand` and
    `_handSkeletonProvider` come pre-wired — leave them alone.
-5. **Pinch wiring:** resolve a same-side ISDK `Hand` per input object (walk up to
-   the `LeftHandAnchor` / `RightHandAnchor` ancestor, fall back to the controller
-   side, match `Hand.Handedness`) and OR
+5. **Pinch wiring:** resolve a same-side ISDK `Hand` per input object and OR
    `hand.IsConnected && hand.GetFingerIsPinching(HandFinger.Index)` into the
-   existing trigger-held path, keeping controller behavior unchanged. Resolve
-   lazily so a null hand simply means pinch is inactive. The gameplay assembly
-   needs an `Oculus.Interaction` asmdef reference.
-6. **No maintained-test requirement for this skill.** If the repo has no test
-   harness covering VR input, do not add a test framework; verify via recompile +
-   console instead (no screenshots — you check visuals yourself).
+   existing trigger-held path, keeping controller behavior unchanged. The
+   gameplay assembly needs an `Oculus.Interaction` asmdef reference.
+6. **No test-framework requirement.** If the repo has no harness covering VR
+   input, do not add one; verify via recompile + console.
 
-## Enshrined API facts (do NOT re-probe via `eval`)
+## Pinned reference (current SDK — hardcoded, do NOT re-verify at runtime)
 
-- **Namespaces (hard requirement):** `Hand`, `Handedness` (`Left = 0, Right = 1`),
-  `HandFinger` (`Index = 1`) live in `Oculus.Interaction.Input`;
-  `HandVisual` lives in `Oculus.Interaction`; `FromOVRHandDataSource`,
-  `OVRCameraRigRef`, `TrackingToWorldTransformerOVR` live in
-  `Oculus.Interaction.Input` (interaction.ovr package). `Hand.Handedness`,
-  `Hand.IsConnected`, and `Hand.GetFingerIsPinching(finger)` are public.
-- **Prefab paths (verify locally before use — an SDK upgrade may move them):**
-  `Packages/com.meta.xr.sdk.interaction.ovr/Runtime/Prefabs/Hands/OVRHandsDataSource.prefab`
-  and `Packages/com.meta.xr.sdk.interaction/Runtime/Prefabs/Hands/OVRHandVisualLeft.prefab`
-  / `OVRHandVisualRight.prefab`. Confirm under
-  `Library/PackageCache/com.meta.xr.sdk.interaction*/`.
-- `FromOVRHandDataSource.Start()` asserts `CameraRigRef`, then
-  `TrackingToWorldTransformer`, then `HandSkeletonProvider`, then `_ovrHand` —
-  the first throw masks the later ones, so wire rig ref AND transformer together
-  before the first Play. Prefab state: `_cameraRigRef` and
-  `_trackingToWorldTransformer` are EMPTY (must wire); `_ovrHand` (correct
-  `HandType`: left child `0`, right child `1`, since `OVRPlugin.Hand` is
-  `None = -1, HandLeft = 0, HandRight = 1`) and `_handSkeletonProvider` are
-  pre-wired (do not touch).
-- `HandVisual.InjectHand(IHand)` is public — call it directly after
-  instantiating visuals; re-running it on existing visuals is idempotent.
-- **Side detection inside edit-mode `eval`:** do NOT read `Hand.Handedness`
-  (needs live data). Instead read each root `Hand`'s
-  `_iModifyDataFromSourceMono` via `SerializedObject` and match the referenced
-  object's GameObject name (`OVRHandDataSourceLeft` / `...Right`).
-- Asset YAML value (safe to `grep` locally): `handTrackingSupport: 1` ==
-  `ControllersAndHands`.
+- Prefabs (GUID → path; resolve via `AssetDatabase.GUIDToAssetPath`):
+  `50375bfeeea522849bd08dabcf6aeb83` → `.../interaction.ovr/.../Hands/OVRHandsDataSource.prefab`;
+  `70d02a90551f23042a882cdceeaf8e3a` → `.../interaction/.../Hands/OVRHandVisualLeft.prefab`;
+  `34a22dd67c1e5344591237fdd61e78ec` → `.../interaction/.../Hands/OVRHandVisualRight.prefab`.
+  Instantiated object names: `OVRHandsDataSource` (children
+  `OVRHandDataSourceLeft`/`...Right`), `OVRHandVisualLeft`/`...Right`.
+- Namespaces: `HandVisual` in `Oculus.Interaction`; `Hand`, `Handedness`,
+  `HandFinger`, `FromOVRHandDataSource`, `OVRCameraRigRef`,
+  `TrackingToWorldTransformerOVR` in `Oculus.Interaction.Input`;
+  `OVRCameraRig`, `OVRHand`, `OVRProjectConfig` are global-namespace.
+  (`Oculus.Interaction.Hand` does NOT exist — fix the namespace, not the asmdef.)
+- Serialized fields: sources `_cameraRigRef` + `_trackingToWorldTransformer`
+  (empty in prefab, must wire) and `_ovrHand` + `_handSkeletonProvider`
+  (pre-wired); `OVRCameraRigRef._ovrCameraRig` + `_requireOvrHands` (set
+  `false`); transformer `_cameraRigRef`; `Hand._iModifyDataFromSourceMono`
+  references the sibling source object named `OVRHandDataSourceLeft/Right`
+  (this is how sides are detected — never read `Hand.Handedness` in Editor code).
+- Config: `OVRProjectConfig.HandTrackingSupport.ControllersAndHands == 1`;
+  commit via `CommitProjectConfig(OVRProjectConfig.CachedProjectConfig)`.
+- Pipeline commands (0.6.0-exp.1): `editor_status`, `recompile_status`,
+  `run_script --file <project-root-relative .cs> --entry <Type.Method> --timeout_ms 120000`,
+  `save_scene`, `get_console_logs --severity Error --limit 20`,
+  `editor_stop`.
 
 ## Procedure
 
-0. Fast-path pre-checks (local, instant). Skip steps that already pass:
-   - `IsHandPinchHeld` using ISDK `Hand` present in the gameplay source (e.g.
-     `VRGolfClub.cs`), with `Oculus.Interaction` in the gameplay asmdef
-     references → skip step 1.
-   - `handTrackingSupport: 1` in
-     `Assets/Oculus/OculusProjectConfig.asset`, AND `HandVisualLeft`,
-     `HandVisualRight`, `OVRHandsDataSource`, and `OVRCameraRigRef` in the scene
-     file → skip step 2.
-1. (Pinch wiring absent only) Source edits: add `Oculus.Interaction` to the
-   gameplay asmdef `references`, paste the proven block below (adapt the
-   `controller` field name to the gameplay class; add
-   `using Oculus.Interaction.Input;`) and OR `IsHandPinchHeld()` into the
-   existing trigger-held expression, keeping controller behavior unchanged. No
-   hierarchy investigation is needed — the walk-up handles clubs under
-   controller anchors (e.g. `RightControllerAnchor`) as well as hand anchors.
-   Then poll `recompile_status` ONCE with a generous wait; run a forced
-   `unity command recompile` only if still compiling/stale (forced recompiles
-   can stall on approval — auto-compile after a source edit usually
-   suffices). Poll again only if still compiling. (Order matters: do
-   Editor-affecting `eval_file` work only after the game assembly is freshly
-   compiled — see gotchas.)
-
+0. ONE pre-check shell call (instant). Run exactly this:
+   ```bash
+   grep -c "IsHandPinchHeld" Assets/MinimalGolf/Scripts/VRGolfClub.cs; grep -o '"Oculus.Interaction"' Assets/MinimalGolf/MinimalGolf.asmdef; grep "handTrackingSupport" Assets/Oculus/OculusProjectConfig.asset; grep -o "HandVisualLeft\|HandVisualRight\|OVRHandsDataSource\|OVRCameraRigRef" Assets/MinimalGolf/Scenes/MinimalGolf.unity | sort | uniq -c
+   ```
+   Skip step 1 when pinch is present AND the asmdef reference is present.
+   Skip step 2 when config is `1` AND all four scene markers are present.
+   Skip both → jump to step 4 (verify only).
+1. (Pinch wiring absent only) Four local edits, no Unity calls: add
+   `"Oculus.Interaction"` to the gameplay asmdef `references`; in the
+   gameplay class add `using Oculus.Interaction.Input;`, the two fields
+   below, the two methods below (adapt the `controller` field name), and OR
+   `IsHandPinchHeld()` into the existing trigger-held expression:
    ```csharp
    private Hand sameSideHand;
    private int handResolveNextFrame;
-
+   ```
+   ```csharp
    private void TryResolveSameSideHand()
    {
        if (sameSideHand != null) return;
@@ -165,70 +138,265 @@ Each `unity command` costs seconds, so minimize round trips:
        catch { return false; }
    }
    ```
-2. (Config, data source, visuals, or rig wiring missing only) Run ONE `eval_file`
-   that does everything in straight-line statements: set `handTrackingSupport`
-   to `ControllersAndHands` and commit via
-   `OVRProjectConfig.CommitProjectConfig(OVRProjectConfig.CachedProjectConfig)`
-   (never touch `handTrackingFrequency`); instantiate/skip `OVRHandsDataSource`
-   at the scene root (Undo-registered); resolve the two root `Hand`s by their
-   `_iModifyDataFromSourceMono` parent names; instantiate/skip
-   `HandVisualLeft`/`HandVisualRight` per anchor (Undo-registered) and
-   `InjectHand` the matching hand; add/skip `OVRCameraRigRef` on the rig
-   (`_ovrCameraRig` = the rig, `_requireOvrHands = false`) and assign it to both
-   sources; add/skip ONE shared `TrackingToWorldTransformerOVR` on the
-   data-source root (injected with the rig ref) and assign it to both sources;
-   destroy any legacy `OVRHandPrefab*` instances (anchor-scoped
-   `GetComponentsInChildren<OVRHand>(true)`, name-matched — see gotchas); then
-   `Debug.Log` one `ISDKVIS-READBACK …` line per anchor (`visual=… hand=injected
-   mesh=LeftHand/RightHand`) and one per source
-   (`rigRef=True ovrHand=True transformer=True skeleton=True`).
-   Confirm via console logs — do NOT write a second verify script.
-   Before running it, confirm the three prefab paths exist locally (instant, zero
-   Editor calls) and fail fast instead of burning a round trip.
-3. `unity command save_scene` (only if step 1 or 2 ran AND the logs show a
-   change — skip when visuals/data source/rig wiring already report existing and
-   the config was already set; a no-op save still risks a domain reload).
-4. Single verification pass in ONE shell call: `recompile_status` is
-   `completed` with no errors, `editor_status` is `ready`,
-   `get_console_logs --severity Error --limit 20` returns zero logs, and the
-   read-back lines show injected visuals with static meshes plus all-`True`
-   source wirings. Note: `FromOVRHandDataSource` asserts run only in Play mode,
-   so the static all-`True` read-back is the proxy — hand the user a Play-mode
-   confirmation ("press Play; the Camera-Rig-Ref / transformer assertions should
-   be gone").
-5. Check `git status` — revert `Assets/Resources/OculusRuntimeSettings.asset`
-   if it was dirtied (e.g. by your own simulator toggle) to keep the
-   hand-tracking diff minimal.
+   (Game code compiled normally may use the two-argument
+   `FindObjectsByType` overload; the single-argument restriction below is
+   `run_script`-only.)
+2. (Config, data source, visuals, or rig wiring missing only) ONE status
+   gate, ONE script write, ONE `run_script`:
+   - Gate (one call): `unity command editor_status && unity command recompile_status`.
+     Proceed when `status` is `ready`, no compile/reload is in flight, and
+     recompile is `completed`. If `playMode` is `playing`, the Editor was
+     left in Play mode (scene edits made there are lost) — run
+     `unity command editor_stop`, then poll back with the bounded loop
+     (no fixed sleeps):
+     `for i in 1 2 3 4 5 6; do unity command editor_status && break || sleep 10; done`.
+     If recompile is still running, same loop on `recompile_status`.
+   - Write the full `Temp/ISDKHandSetup.cs` below (outside `Assets/`, so
+     writing it triggers no import/domain reload; `--file` resolves against
+     the project root) and run it once:
+     `unity command run_script --file Temp/ISDKHandSetup.cs --entry ISDKHandSetup.Main --timeout_ms 120000`.
+     It sets the config, creates/skips the data source, resolves both hands
+     by modifier parent name, creates/skips + injects both visuals, wires
+     rig ref + transformer, removes legacy prefabs, and logs one
+     `ISDKVIS-READBACK` line per anchor and per source. Confirm via those
+     lines in the result — do NOT write a second verify script.
+   ```csharp
+   using System.Collections.Generic;
+   using UnityEditor;
+   using UnityEditor.SceneManagement;
+   using UnityEngine;
+   using UnityEngine.SceneManagement;
+   using Oculus.Interaction;
+   using Oculus.Interaction.Input;
+
+   public static class ISDKHandSetup
+   {
+       public static string Main()
+       {
+           List<string> log = new List<string>();
+
+           OVRProjectConfig cfg = OVRProjectConfig.CachedProjectConfig;
+           cfg.handTrackingSupport = OVRProjectConfig.HandTrackingSupport.ControllersAndHands;
+           OVRProjectConfig.CommitProjectConfig(OVRProjectConfig.CachedProjectConfig);
+           log.Add("config handTrackingSupport=" + ((int)OVRProjectConfig.CachedProjectConfig.handTrackingSupport).ToString());
+
+           OVRCameraRig rig = Object.FindAnyObjectByType<OVRCameraRig>();
+           if (rig == null) { return Fail(log, "no OVRCameraRig in scene"); }
+           Transform leftAnchor = rig.leftHandAnchor;
+           Transform rightAnchor = rig.rightHandAnchor;
+           if (leftAnchor == null || rightAnchor == null) { return Fail(log, "missing hand anchors"); }
+
+           GameObject dsPrefab = LoadPrefab("50375bfeeea522849bd08dabcf6aeb83", log);
+           GameObject visLeftPrefab = LoadPrefab("70d02a90551f23042a882cdceeaf8e3a", log);
+           GameObject visRightPrefab = LoadPrefab("34a22dd67c1e5344591237fdd61e78ec", log);
+           if (dsPrefab == null || visLeftPrefab == null || visRightPrefab == null) { return Fail(log, "prefab load failed"); }
+
+           GameObject dsRoot = GameObject.Find("OVRHandsDataSource");
+           FromOVRHandDataSource[] sceneSources = Object.FindObjectsByType<FromOVRHandDataSource>(FindObjectsInactive.Include);
+           if (dsRoot == null && sceneSources.Length > 0)
+           {
+               Transform t = sceneSources[0].transform.parent;
+               dsRoot = (t != null ? t.gameObject : sceneSources[0].gameObject);
+           }
+           if (dsRoot == null)
+           {
+               dsRoot = (GameObject)PrefabUtility.InstantiatePrefab(dsPrefab);
+               dsRoot.name = dsPrefab.name;
+               Undo.RegisterCreatedObjectUndo(dsRoot, "Add OVRHandsDataSource");
+               log.Add("datasource created");
+           }
+           else
+           {
+               log.Add("datasource existing");
+           }
+
+           Hand leftHand = null;
+           Hand rightHand = null;
+           Hand[] hands = dsRoot.GetComponentsInChildren<Hand>(true);
+           foreach (Hand h in hands)
+           {
+               SerializedObject hso = new SerializedObject(h);
+               SerializedProperty hp = hso.FindProperty("_iModifyDataFromSourceMono");
+               Object src = (hp != null ? hp.objectReferenceValue : null);
+               string owner = "";
+               if (src is Component) { owner = ((Component)src).gameObject.name; }
+               if (owner == "OVRHandDataSourceLeft") { leftHand = h; }
+               else if (owner == "OVRHandDataSourceRight") { rightHand = h; }
+           }
+           if (leftHand == null || rightHand == null) { return Fail(log, "hand resolve failed"); }
+           log.Add("hands resolved");
+
+           EnsureVisual(leftAnchor, visLeftPrefab, leftHand, "Left", log);
+           EnsureVisual(rightAnchor, visRightPrefab, rightHand, "Right", log);
+
+           OVRCameraRigRef rigRef = rig.GetComponent<OVRCameraRigRef>();
+           if (rigRef == null)
+           {
+               rigRef = Undo.AddComponent<OVRCameraRigRef>(rig.gameObject);
+               log.Add("rigref created");
+           }
+           else
+           {
+               log.Add("rigref existing");
+           }
+           Undo.RecordObject(rigRef, "Wire OVRCameraRigRef");
+           SerializedObject rso = new SerializedObject(rigRef);
+           SetObjectRef(rso, "_ovrCameraRig", rig);
+           SerializedProperty reqProp = rso.FindProperty("_requireOvrHands");
+           if (reqProp != null) { reqProp.boolValue = false; }
+           rso.ApplyModifiedProperties();
+
+           TrackingToWorldTransformerOVR xform = dsRoot.GetComponent<TrackingToWorldTransformerOVR>();
+           if (xform == null)
+           {
+               xform = Undo.AddComponent<TrackingToWorldTransformerOVR>(dsRoot);
+               log.Add("transformer created");
+           }
+           else
+           {
+               log.Add("transformer existing");
+           }
+           Undo.RecordObject(xform, "Wire transformer");
+           SerializedObject xso = new SerializedObject(xform);
+           SetObjectRef(xso, "_cameraRigRef", rigRef);
+           xso.ApplyModifiedProperties();
+
+           FromOVRHandDataSource[] sources = dsRoot.GetComponentsInChildren<FromOVRHandDataSource>(true);
+           foreach (FromOVRHandDataSource s in sources)
+           {
+               Undo.RecordObject(s, "Wire hand data source");
+               SerializedObject sso = new SerializedObject(s);
+               SetObjectRef(sso, "_cameraRigRef", rigRef);
+               SetObjectRef(sso, "_trackingToWorldTransformer", xform);
+               sso.ApplyModifiedProperties();
+               SerializedObject read = new SerializedObject(s);
+               string line = "ISDKVIS-READBACK source=" + s.gameObject.name
+                   + " rigRef=" + HasRef(read, "_cameraRigRef")
+                   + " ovrHand=" + HasRef(read, "_ovrHand")
+                   + " transformer=" + HasRef(read, "_trackingToWorldTransformer")
+                   + " skeleton=" + HasRef(read, "_handSkeletonProvider");
+               Debug.Log(line);
+               log.Add(line);
+           }
+
+           int removed = 0;
+           Transform[] anchors = new Transform[] { leftAnchor, rightAnchor };
+           foreach (Transform a in anchors)
+           {
+               OVRHand[] legacy = a.GetComponentsInChildren<OVRHand>(true);
+               foreach (OVRHand o in legacy)
+               {
+                   if (o != null && o.gameObject.name.Contains("OVRHandPrefab"))
+                   {
+                       Undo.DestroyObjectImmediate(o.gameObject);
+                       removed++;
+                   }
+               }
+           }
+           log.Add("legacy removed=" + removed.ToString());
+
+           EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+           string summary = string.Join("\n", log.ToArray());
+           Debug.Log("ISDKVIS-DONE\n" + summary);
+           return summary;
+       }
+
+       private static void EnsureVisual(Transform anchor, GameObject prefab, Hand hand, string side, List<string> log)
+       {
+           HandVisual visual = anchor.GetComponentInChildren<HandVisual>(true);
+           if (visual == null)
+           {
+               GameObject go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, anchor);
+               go.name = prefab.name;
+               Undo.RegisterCreatedObjectUndo(go, "Add HandVisual" + side);
+               visual = go.GetComponentInChildren<HandVisual>(true);
+               log.Add("visual" + side + " created");
+           }
+           else
+           {
+               log.Add("visual" + side + " existing");
+           }
+           if (visual != null && hand != null) { visual.InjectHand(hand); }
+           string mesh = "none";
+           if (visual != null)
+           {
+               SkinnedMeshRenderer smr = visual.GetComponentInChildren<SkinnedMeshRenderer>(true);
+               if (smr != null && smr.sharedMesh != null) { mesh = smr.sharedMesh.name; }
+           }
+           string line = "ISDKVIS-READBACK anchor=" + anchor.name
+               + " visual=" + (visual != null ? visual.gameObject.name : "missing")
+               + " hand=" + (hand != null ? "injected" : "MISSING")
+               + " mesh=" + mesh;
+           Debug.Log(line);
+           log.Add(line);
+       }
+
+       private static GameObject LoadPrefab(string guid, List<string> log)
+       {
+           string path = AssetDatabase.GUIDToAssetPath(guid);
+           if (string.IsNullOrEmpty(path))
+           {
+               log.Add("guid " + guid + " unresolved");
+               return null;
+           }
+           GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+           log.Add("prefab " + path + (prefab == null ? " NULL" : " ok"));
+           return prefab;
+       }
+
+       private static void SetObjectRef(SerializedObject so, string prop, Object val)
+       {
+           SerializedProperty p = so.FindProperty(prop);
+           if (p != null) { p.objectReferenceValue = val; }
+       }
+
+       private static bool HasRef(SerializedObject so, string prop)
+       {
+           SerializedProperty p = so.FindProperty(prop);
+           return p != null && p.objectReferenceValue != null;
+       }
+
+       private static string Fail(List<string> log, string reason)
+       {
+           log.Add("FAILED " + reason);
+           string summary = string.Join("\n", log.ToArray());
+           Debug.LogError("ISDKVIS-FAILED " + reason + "\n" + summary);
+           return summary;
+       }
+   }
+   ```
+3. `unity command save_scene` — only if step 1 or 2 ran AND the
+   `run_script` result contains `created`. Skip on a no-op (avoids a
+   needless domain reload).
+4. Single verification pass in ONE shell call:
+   `unity command recompile_status && unity command editor_status && unity command get_console_logs --severity Error --limit 20`.
+   Done when recompile is `completed` with no errors, editor is `ready`,
+   zero error logs, and the step-2 read-back shows injected visuals with
+   static meshes plus all-`True` source wirings. Note:
+   `FromOVRHandDataSource` asserts run only in Play mode, so the static
+   all-`True` read-back is the proxy — hand the user a Play-mode
+   confirmation ("press Play; the Camera-Rig-Ref / transformer assertions
+   should be gone"). Report failures rather than claiming success.
+5. ONE cleanup call: delete `Temp/ISDKHandSetup.cs`, then
+   `git status --short`. Revert `Assets/Resources/OculusRuntimeSettings.asset`
+   if listed (the simulator toggle dirties it — unrelated to this skill).
 
 ## Gotchas
 
-- **Namespace trap:** `Oculus.Interaction.Hand` does NOT exist — `Hand`,
-  `Handedness`, and `HandFinger` are in `Oculus.Interaction.Input`, while
-  `HandVisual` is in `Oculus.Interaction`. In `eval_file` this surfaces as
-  "`Hand` does not exist in the namespace 'Oculus.Interaction' (are you missing
-  an assembly reference?)" — fix the namespace, not the asmdef.
-- **Assert masking:** the first failing `Start()` assert throws, hiding the rest.
-  A clean console for `CameraRigRef` does NOT mean the transformer is wired —
-  always wire rig ref AND transformer in the same pass and read back all four
-  flags per source.
-- **`eval_file` takes statements only, no `return`.** The harness appends code after
-  the file, so any `return` fails with "Unreachable code detected". Structure scripts
-  as straight-line statements (`foreach` + `continue` instead of early returns) with
-  read-back logging inline.
-- `OVRProjectConfig.CommitProjectConfig` requires an argument:
-  `CommitProjectConfig(OVRProjectConfig.CachedProjectConfig)`.
-- If a script fails with `NullReferenceException` right after a source edit, the game
-  assembly is stale: wait for `recompile_status: completed`, confirm `editor_status`
-  is ready, and re-run the same script unchanged.
-- `unity command eval` treats Obsolete warnings as errors: use `FindAnyObjectByType`,
-  not `FindFirstObjectByType`; use `FindObjectsByType<T>(FindObjectsInactive)` without
-  a `FindObjectsSortMode` argument. (Source files compiled normally may use the
-  two-argument overload freely.)
-- `GameObject.Find` only finds ACTIVE objects — legacy-prefab cleanup that reports
-  "removed 0" while the scene file still references the prefabs means the lookup
-  missed, not that the scene is clean. Prefer anchor-scoped
-  `GetComponentsInChildren<OVRHand>(true)` + name match, and confirm with
-  `grep` on the scene file after saving.
-- The Meta XR Simulator toggle writes unrelated state (e.g. `fovSimulationEnabled`)
-  into `Assets/Resources/OculusRuntimeSettings.asset`. Revert that file if it shows
-  up in `git status` to keep the hand-tracking diff minimal.
+- **`run_script` compiles with Obsolete warnings as errors:** use
+  `FindAnyObjectByType`, never `FindFirstObjectByType`; use
+  `FindObjectsByType<T>(FindObjectsInactive)` with NO `FindObjectsSortMode`
+  argument. It needs a full class + named static entry (`Type.Method`);
+  `return` is fine; keep everything in the one file.
+- **Assert masking:** the first failing `Start()` assert throws, hiding the
+  rest. A clean console for `CameraRigRef` does NOT mean the transformer is
+  wired — the script wires rig ref AND transformer in the same pass and
+  reads back all four flags per source.
+- **`GameObject.Find` only finds ACTIVE objects** — the script falls back to
+  `FindObjectsByType` for the data source and uses anchor-scoped
+  `GetComponentsInChildren<OVRHand>(true)` + name match for legacy cleanup.
+  Confirm no `OVRHandPrefab*` remains with a scene-file `grep` after saving.
+- If `run_script` fails with `NullReferenceException` right after a source
+  edit, the game assembly is stale: wait for `recompile_status: completed`,
+  confirm `editor_status` is `ready`, and re-run unchanged.
+
