@@ -31,6 +31,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 0.34
+    - _CullMode: 2
     - _OutlineEnabled: 1
     - _OutlineWidth: 0.002
     - _RimPower: 3.8
@@ -40,8 +41,8 @@ Material:
     - _UseVertexColor: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _OutlineColor: {r: 0.8, g: 0.8, b: 0.83, a: 1}
+    - _OutlineColor: {r: 0.31132078, g: 0.31132078, b: 0.31132078, a: 1}
     - _RimColor: {r: 0.7411765, g: 0.92156863, b: 1, a: 1}
-    - _ShadeColor: {r: 0.55, g: 0.68, b: 0.72, a: 1}
+    - _ShadeColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
