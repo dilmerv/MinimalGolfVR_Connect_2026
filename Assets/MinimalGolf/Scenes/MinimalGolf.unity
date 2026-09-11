@@ -3593,7 +3593,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 0.7
+  m_Volume: 0.05
   m_Pitch: 1
   Loop: 0
   Mute: 0
@@ -3693,7 +3693,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 5ea6a48bf9f484727a027508f039c569, type: 3}
   - {fileID: 8300000, guid: cd2325f5549a4404790df95f0b1eaef2, type: 3}
   - {fileID: 8300000, guid: ffdea5a2ef3b94ec6ab4c37dd977a725, type: 3}
-  musicVolume: 0.32
+  musicVolume: 0.025
   shotClips:
   - {fileID: 8300000, guid: b31ede4260410434bbf50db3a6166c0d, type: 3}
   - {fileID: 8300000, guid: 5b61db58a01e14a48b0006c61b61bd35, type: 3}
@@ -3704,7 +3704,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 89b243e0aa41640a59c95d0b91d47994, type: 3}
   collisionClip: {fileID: 0}
   rotationClip: {fileID: 8300000, guid: 0f850e18f0e294207afd723e3424dff6, type: 3}
-  sfxVolume: 0.7
+  sfxVolume: 0.05
 --- !u!82 &203006695
 AudioSource:
   m_ObjectHideFlags: 0
@@ -3718,7 +3718,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 0.32
+  m_Volume: 0.025
   m_Pitch: 1
   Loop: 0
   Mute: 0
