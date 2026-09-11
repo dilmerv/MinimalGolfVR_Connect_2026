@@ -14197,7 +14197,9 @@ MonoBehaviour:
   horizonFalloff: 0.01
   starDensity: 4
   starSharpness: 200
-  starIntensity: 0.81
+  starMinSize: 0.5
+  starMaxSize: 1.6
+  starIntensity: 2
   starColor: {r: 1, g: 1, b: 1, a: 1}
   starColorVariation: 0.61
   starMinBrightness: 0.328
@@ -14211,8 +14213,8 @@ MonoBehaviour:
   cometIntensity: 1.11
   cometSpeed: 0.22
   cometLength: 0.35
-  cometSharpness: 70
-  cometFrequency: 0.025
+  cometSharpness: 48.3
+  cometFrequency: 0.04
   cometTailFalloff: 8
 --- !u!1 &901252805
 GameObject:
@@ -27356,7 +27358,7 @@ Transform:
   m_GameObject: {fileID: 1814949055}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.1, z: 0.55}
+  m_LocalPosition: {x: 0, y: 0.88, z: 0.55}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:

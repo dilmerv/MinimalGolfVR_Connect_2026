@@ -25,10 +25,10 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _CometFrequency: 0.025
+    - _CometFrequency: 0.04
     - _CometIntensity: 1.11
     - _CometLength: 0.35
-    - _CometSharpness: 70
+    - _CometSharpness: 48.3
     - _CometSpeed: 0.22
     - _CometTailFalloff: 8
     - _EnableComets: 1
@@ -36,8 +36,10 @@ Material:
     - _HorizonHeight: -0.182
     - _StarColorVariation: 0.61
     - _StarDensity: 4
-    - _StarIntensity: 0.81
+    - _StarIntensity: 2
+    - _StarMaxSize: 1.6
     - _StarMinBrightness: 0.328
+    - _StarMinSize: 0.5
     - _StarRotationSpeed: 0.06
     - _StarSharpness: 200
     - _TimeScale: 1

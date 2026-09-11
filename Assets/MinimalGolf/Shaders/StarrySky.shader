@@ -11,6 +11,8 @@ Shader "MinimalGolf/StarrySky"
         [Header(Stars)]
         _StarDensity("Star Density", Range(0.2, 4.0)) = 1.2
         _StarSharpness("Star Sharpness", Range(5, 200)) = 42
+        _StarMinSize("Star Min Size", Range(0.1, 3.0)) = 0.6
+        _StarMaxSize("Star Max Size", Range(0.1, 3.0)) = 1.4
         _StarIntensity("Star Intensity", Range(0, 2)) = 1.0
         _StarColor("Star Color", Color) = (1, 1, 1, 1)
         _StarColorVariation("Star Color Variation", Range(0, 1)) = 0.35
@@ -55,6 +57,8 @@ Shader "MinimalGolf/StarrySky"
             half _HorizonFalloff;
             half _StarDensity;
             half _StarSharpness;
+            half _StarMinSize;
+            half _StarMaxSize;
             half _StarIntensity;
             half4 _StarColor;
             half _StarColorVariation;
@@ -187,7 +191,10 @@ Shader "MinimalGolf/StarrySky"
                 float starPresence = step(0.38, brightnessSelect);
                 float magnitude = lerp(_StarMinBrightness, 1.0, hash11(starHash * 812.0));
 
-                float star = 1.0 - saturate(dist * _StarSharpness * 0.25);
+                float sizeLo = min(_StarMinSize, _StarMaxSize);
+                float sizeHi = max(_StarMinSize, _StarMaxSize);
+                float starSize = lerp(sizeLo, sizeHi, hash11(starHash * 613.0));
+                float star = 1.0 - saturate(dist * _StarSharpness * 0.25 / max(starSize, 1e-3));
                 star = pow(star, 9.0) * starPresence * magnitude;
 
                 float twPhase = starHash * 6.2831853 * 1.7;

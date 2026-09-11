@@ -35,6 +35,8 @@ namespace MinimalGolf
         [Header("Stars")]
         [Range(0.2f, 4f)] public float starDensity = 1.2f;
         [Range(5f, 200f)] public float starSharpness = 42f;
+        [Range(0.1f, 3f)] public float starMinSize = 0.6f;
+        [Range(0.1f, 3f)] public float starMaxSize = 1.4f;
         [Range(0f, 2f)] public float starIntensity = 1f;
         [ColorUsage(false)] public Color starColor = Color.white;
         [Range(0f, 1f)] public float starColorVariation = 0.35f;
@@ -64,6 +66,8 @@ namespace MinimalGolf
         static readonly int ID_HorizonFalloff = Shader.PropertyToID("_HorizonFalloff");
         static readonly int ID_StarDensity = Shader.PropertyToID("_StarDensity");
         static readonly int ID_StarSharpness = Shader.PropertyToID("_StarSharpness");
+        static readonly int ID_StarMinSize = Shader.PropertyToID("_StarMinSize");
+        static readonly int ID_StarMaxSize = Shader.PropertyToID("_StarMaxSize");
         static readonly int ID_StarIntensity = Shader.PropertyToID("_StarIntensity");
         static readonly int ID_StarColor = Shader.PropertyToID("_StarColor");
         static readonly int ID_StarColorVariation = Shader.PropertyToID("_StarColorVariation");
@@ -96,6 +100,9 @@ namespace MinimalGolf
         {
             // Clamp to avoid extreme Quest cost
             starDensity = Mathf.Clamp(starDensity, 0.2f, 4f);
+            starMinSize = Mathf.Clamp(starMinSize, 0.1f, 3f);
+            starMaxSize = Mathf.Clamp(starMaxSize, 0.1f, 3f);
+            if (starMaxSize < starMinSize) starMaxSize = starMinSize;
             cometFrequency = Mathf.Clamp(cometFrequency, 0f, 0.15f);
             ApplyToMaterial();
             ValidateNaming();
@@ -193,6 +200,8 @@ namespace MinimalGolf
             target.SetFloat(ID_HorizonFalloff, horizonFalloff);
             target.SetFloat(ID_StarDensity, starDensity);
             target.SetFloat(ID_StarSharpness, starSharpness);
+            target.SetFloat(ID_StarMinSize, starMinSize);
+            target.SetFloat(ID_StarMaxSize, starMaxSize);
             target.SetFloat(ID_StarIntensity, starIntensity);
             target.SetColor(ID_StarColor, starColor);
             target.SetFloat(ID_StarColorVariation, starColorVariation);
@@ -241,6 +250,8 @@ namespace MinimalGolf
             horizonFalloff = 0.25f;
             starDensity = 1.2f;
             starSharpness = 42f;
+            starMinSize = 0.6f;
+            starMaxSize = 1.4f;
             starIntensity = 1f;
             starColor = Color.white;
             starColorVariation = 0.35f;
