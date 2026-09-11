@@ -2090,8 +2090,8 @@ MonoBehaviour:
   playableSpeed: 0.1
   vrMaximumDragDistance: 0.16
   vrMinShotPower: 0.001
-  assistRadius: 0.04
-  captureRadius: 0.008
+  assistRadius: 0.065
+  captureRadius: 0.0125
   maximumAssistedSpeed: 0.6
   maximumCaptureSpeed: 0.35
   minimumPullAcceleration: 0.35
@@ -27358,7 +27358,7 @@ Transform:
   m_GameObject: {fileID: 1814949055}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.88, z: 0.55}
+  m_LocalPosition: {x: 0, y: 1.1, z: 0.55}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
