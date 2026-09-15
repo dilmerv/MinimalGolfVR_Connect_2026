@@ -202,7 +202,7 @@ namespace MinimalGolf
             powerCanvas.gameObject.SetActive(show);
             if (!show) return;
             float power = game.ShotPower;
-            if (powerLabel != null) powerLabel.text = "PUTT STRENGTH";
+            if (powerLabel != null) powerLabel.text = "PULL STRENGTH";
             if (powerPercent != null) powerPercent.text = Mathf.RoundToInt(power * 100f) + "%";
             if (powerSegments == null) return;
             Color col = power < 0.55f ? Color.Lerp(new Color32(0x89, 0xE0, 0xB3, 0xFF), new Color32(0xF3, 0xC9, 0x6B, 0xFF), power / 0.55f)

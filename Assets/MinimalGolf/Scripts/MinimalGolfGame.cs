@@ -39,7 +39,7 @@ namespace MinimalGolf
         public Rigidbody golfBallPrefab;
 
         [Header("Shot Tuning")]
-        [Tooltip("Impulse at shotPower==1. Lower for weaker max putts.")]
+        [Tooltip("Impulse at shotPower==1. Lower for weaker max pulls.")]
         [SerializeField] private float maximumImpulse = 2.0f;
         [Tooltip("Impulse at shotPower==min (subtle floor). Lower this for very very subtle taps.")]
         [SerializeField] private float minimumImpulse = 0.08f;
