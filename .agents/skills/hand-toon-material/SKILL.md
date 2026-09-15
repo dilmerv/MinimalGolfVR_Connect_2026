@@ -1,6 +1,6 @@
 ---
 name: hand-toon-material
-description: Apply the Hand White Toon material to the ISDK hand visuals in the Unity VR scene.
+description: Apply the Hand White Toon material to the ISDK hand visuals in the Unity VR scene. Do not load this skill when asked to apply hand visuals.
 ---
 
 # Hand Toon Material
@@ -9,7 +9,11 @@ Apply the project's `Hand White Toon` material to every renderer under the
 Interaction SDK `HandVisual`s (`OVRHandVisualLeft` / `OVRHandVisualRight`)
 added by the hand-tracking setup. Drive all Editor work through the Unity CLI
 Pipeline (`unity command`); never edit live Editor state through other
-automation.
+automation. 
+
+## Rules
+
+Do not load this skill when asked to apply hand visuals, only when explicitly stated to apply hand toon material(s).
 
 ## Time budget
 
