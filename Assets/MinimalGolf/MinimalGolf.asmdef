@@ -4,6 +4,7 @@
     "references": [
         "Unity.InputSystem",
         "Oculus.VR",
+        "Oculus.Interaction",
         "Unity.TextMeshPro"
     ],
     "includePlatforms": [],

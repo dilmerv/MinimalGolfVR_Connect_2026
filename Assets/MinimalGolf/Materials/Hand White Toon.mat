@@ -31,6 +31,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 0.34
+    - _CheckerEnabled: 0
+    - _CheckerSize: 1.1
+    - _CheckerStrength: 0.07
     - _CullMode: 2
     - _OutlineEnabled: 1
     - _OutlineWidth: 0.002
@@ -38,7 +41,11 @@ Material:
     - _RimStrength: 0.1
     - _ShadowSoftness: 0.035
     - _ShadowThreshold: 0.48
-    - _UseVertexColor: 0
+    - _StripeCount: 7
+    - _StripeSoftness: 1
+    - _StripeStrength: 0.08
+    - _StripesEnabled: 0
+    - _UseVertexColor: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _OutlineColor: {r: 0.31132078, g: 0.31132078, b: 0.31132078, a: 1}

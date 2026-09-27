@@ -14,6 +14,7 @@ Material:
   m_ValidKeywords:
   - _OUTLINE_ON
   - _REVEAL_CLIP
+  - _STRIPES_ON
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
@@ -32,12 +33,20 @@ Material:
     m_Ints: []
     m_Floats:
     - _AmbientStrength: 0.34
+    - _CheckerEnabled: 0
+    - _CheckerSize: 1.1
+    - _CheckerStrength: 0.07
+    - _CullMode: 2
     - _OutlineEnabled: 1
     - _OutlineWidth: 0.002
     - _RimPower: 3.8
     - _RimStrength: 0.09
     - _ShadowSoftness: 0.035
     - _ShadowThreshold: 0.48
+    - _StripeCount: 6
+    - _StripeSoftness: 0
+    - _StripeStrength: 0.15
+    - _StripesEnabled: 1
     - _UseVertexColor: 0
     m_Colors:
     - _BaseColor: {r: 0.38431373, g: 0.72156864, b: 0.45882353, a: 1}

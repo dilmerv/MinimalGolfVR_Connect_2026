@@ -16,6 +16,13 @@ Shader "Minimal Golf/Toon"
         _OutlineWidth("Outline Width", Range(0,0.04)) = 0.018
         [Toggle] _UseVertexColor("Use Vertex Color", Float) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _CullMode("Cull Mode", Float) = 2
+        [Toggle(_CHECKER_ON)] _CheckerEnabled("Ground Checker", Float) = 0
+        _CheckerSize("Checker Size (World M)", Float) = 1.1
+        _CheckerStrength("Checker Strength", Range(0,0.3)) = 0.07
+        [Toggle(_STRIPES_ON)] _StripesEnabled("Mow Stripes", Float) = 0
+        _StripeCount("Stripe Count", Float) = 7
+        _StripeStrength("Stripe Strength", Range(0,0.3)) = 0.08
+        _StripeSoftness("Stripe Softness", Range(0,1)) = 1
     }
 
     SubShader
@@ -122,6 +129,8 @@ Shader "Minimal Golf/Toon"
             #pragma multi_compile_fragment _ _SHADOWS_SOFT
             #pragma multi_compile_fog
             #pragma shader_feature_local _REVEAL_CLIP
+            #pragma shader_feature_local _CHECKER_ON
+            #pragma shader_feature_local _STRIPES_ON
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
@@ -146,6 +155,7 @@ Shader "Minimal Golf/Toon"
                 float4 shadowCoord : TEXCOORD3;
                 half fogFactor : TEXCOORD4;
                 half4 color : COLOR;
+                float3 positionOS : TEXCOORD5;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
             };
@@ -168,6 +178,11 @@ Shader "Minimal Golf/Toon"
                 half _OutlineWidth;
                 half _UseVertexColor;
                 float _CullMode;
+                float _CheckerSize;
+                half _CheckerStrength;
+                float _StripeCount;
+                half _StripeStrength;
+                half _StripeSoftness;
             CBUFFER_END
 
             Varyings ToonVertex(Attributes input)
@@ -186,6 +201,7 @@ Shader "Minimal Golf/Toon"
                 output.shadowCoord = GetShadowCoord(positionInputs);
                 output.fogFactor = ComputeFogFactor(positionInputs.positionCS.z);
                 output.color = input.color;
+                output.positionOS = input.positionOS.xyz;
                 return output;
             }
 
@@ -195,7 +211,7 @@ Shader "Minimal Golf/Toon"
                 half3 normalWS = normalize(input.normalWS);
                 Light mainLight = GetMainLight(input.shadowCoord);
                 half ndotl = saturate(dot(normalWS, mainLight.direction));
-                half lightValue = ndotl * mainLight.shadowAttenuation * mainLight.distanceAttenuation;
+                half lightValue = ndotl * mainLight.shadowAttenuation;
                 half band = smoothstep(_ShadowThreshold - _ShadowSoftness,
                                        _ShadowThreshold + _ShadowSoftness, lightValue);
 
@@ -211,6 +227,23 @@ Shader "Minimal Golf/Toon"
                 half3 viewDirection = SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
                 half rim = pow(saturate(1.0h - dot(normalWS, viewDirection)), _RimPower) * _RimStrength;
                 color += _RimColor.rgb * rim;
+#ifdef _CHECKER_ON
+                {
+                    float2 checkerUV = input.positionWS.xz / _CheckerSize;
+                    float2 checkerCell = floor(checkerUV);
+                    float checker = fmod(checkerCell.x + checkerCell.y, 2.0);
+                    color *= 1.0 - checker * _CheckerStrength;
+                }
+#endif
+#ifdef _STRIPES_ON
+                {
+                    float stripeU = input.positionOS.x + 0.5;
+                    float wave = sin(stripeU * _StripeCount * 6.2831853);
+                    float edge = max(_StripeSoftness, 1e-3);
+                    float stripe = smoothstep(-edge, edge, wave);
+                    color *= 1.0 - stripe * _StripeStrength;
+                }
+#endif
                 color = MixFog(color, input.fogFactor);
 #ifdef _REVEAL_CLIP
                 half reveal = RevealMask(input.positionWS);

@@ -1,3 +1,4 @@
+using Oculus.Interaction.Input;
 using UnityEngine;
 
 namespace MinimalGolf
@@ -28,6 +29,8 @@ namespace MinimalGolf
         private bool overlappingBall;
         private bool aiming;
         private bool wasTriggerHeld;
+        private Hand sameSideHand;
+        private int handResolveNextFrame;
         private Vector3 aimStartWorld;
         private Rigidbody ballRigidbody;
 
@@ -251,7 +254,7 @@ namespace MinimalGolf
             try { triggerValue = OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, controller); } catch { triggerValue = 0f; }
             bool digitalHeld = OVRInput.Get(OVRInput.Button.PrimaryIndexTrigger, controller);
             bool analogHeld = triggerValue > triggerThreshold;
-            bool triggerHeld = (digitalHeld || analogHeld) || IsMouseTriggerHeldForEditor();
+            bool triggerHeld = (digitalHeld || analogHeld) || IsMouseTriggerHeldForEditor() || IsHandPinchHeld();
             // Edge detection: newly pressed / newly released (handles analog squeeze that never hits digital threshold)
             bool heldDownEdge = triggerHeld && !wasTriggerHeld;
             bool heldUpEdge = !triggerHeld && wasTriggerHeld;
@@ -313,6 +316,35 @@ namespace MinimalGolf
 
             // Store held state for edge detection next frame (must be after all use of wasTriggerHeld)
             wasTriggerHeld = triggerHeld;
+        }
+
+        private void TryResolveSameSideHand()
+        {
+            if (sameSideHand != null) return;
+            if (Time.frameCount < handResolveNextFrame) return;
+            handResolveNextFrame = Time.frameCount + 30;
+            Transform anchor = transform;
+            while (anchor != null && anchor.name != "LeftHandAnchor" && anchor.name != "RightHandAnchor")
+                anchor = anchor.parent;
+            bool isLeft = controller == OVRInput.Controller.LTouch;
+            if (anchor != null)
+                isLeft = anchor.name == "LeftHandAnchor";
+            Handedness wanted = isLeft ? Handedness.Left : Handedness.Right;
+            Hand[] hands = FindObjectsByType<Hand>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (Hand h in hands)
+            {
+                if (h == null) continue;
+                try { if (h.Handedness == wanted) { sameSideHand = h; return; } }
+                catch { continue; }
+            }
+        }
+
+        private bool IsHandPinchHeld()
+        {
+            TryResolveSameSideHand();
+            if (sameSideHand == null) return false;
+            try { return sameSideHand.IsConnected && sameSideHand.GetFingerIsPinching(HandFinger.Index); }
+            catch { return false; }
         }
 
         private Vector3 ProjectToBallPlane(Vector3 world)

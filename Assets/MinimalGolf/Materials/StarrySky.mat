@@ -32,8 +32,8 @@ Material:
     - _CometSpeed: 0.22
     - _CometTailFalloff: 8
     - _EnableComets: 1
-    - _HorizonFalloff: 0.01
-    - _HorizonHeight: -0.182
+    - _HorizonFalloff: 0.06
+    - _HorizonHeight: -0.04
     - _StarColorVariation: 0.61
     - _StarDensity: 4
     - _StarIntensity: 2
@@ -47,7 +47,7 @@ Material:
     - _TwinkleSpeed: 1.2
     m_Colors:
     - _CometColor: {r: 0.85, g: 0.95, b: 1, a: 1}
-    - _HorizonColor: {r: 0.69896924, g: 0.7830189, b: 0.6759078, a: 1}
+    - _HorizonColor: {r: 0.557, g: 0.596, b: 0.443, a: 1}
     - _StarColor: {r: 1, g: 1, b: 1, a: 1}
     - _ZenithColor: {r: 0.061676744, g: 0.08831775, b: 0.16981131, a: 1}
   m_BuildTextureStacks: []

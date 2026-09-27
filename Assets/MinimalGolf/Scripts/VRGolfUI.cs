@@ -47,7 +47,7 @@ namespace MinimalGolf
         private Button playAgainButton;
 
         private static readonly Color PanelColor = new Color(0.055f, 0.14f, 0.19f, 0.90f);
-        private static readonly Color Seafoam = new Color32(0x8B, 0xCB, 0xA8, 0xFF);
+        private static readonly Color CompletedCyan = new Color32(0x3A, 0xD0, 0xE6, 0xFF);
         private static readonly Color Orange = new Color32(0xE1, 0x82, 0x2F, 0xFF);
         private static readonly Color Gold = new Color32(0xF3, 0xC9, 0x6B, 0xFF);
         private static readonly Color PaleText = new Color32(0xFA, 0xF1, 0xD2, 0xFF);
@@ -167,7 +167,7 @@ namespace MinimalGolf
         private void UpdateIdentity()
         {
             if (identityCourse == null || game == null || game.CurrentLevel == null) return;
-            identityCourse.text = game.CurrentLevel.levelName;
+            identityCourse.text = $"HOLE {(game.CurrentLevelIndex + 1):00} \u2022 {game.CurrentLevel.levelName}";
             if (identityLevel != null) identityLevel.text = $"LEVEL {game.CurrentLevelIndex + 1} / {game.AllLevels.Length}";
         }
 
@@ -186,12 +186,12 @@ namespace MinimalGolf
                 if (progressPips[i] == null) continue;
                 bool current = i == game.CurrentLevelIndex;
                 Color col;
-                if (i < game.CurrentLevelIndex) col = Seafoam;
+                if (i < game.CurrentLevelIndex) col = CompletedCyan;
                 else if (current) col = Orange;
                 else col = new Color(PaleText.r, PaleText.g, PaleText.b, 0.18f);
                 progressPips[i].color = col;
                 var rt = progressPips[i].rectTransform;
-                rt.sizeDelta = new Vector2(rt.sizeDelta.x, current ? 10f : 6f);
+                rt.sizeDelta = new Vector2(rt.sizeDelta.x, current ? 12f : 8f);
             }
         }
 
